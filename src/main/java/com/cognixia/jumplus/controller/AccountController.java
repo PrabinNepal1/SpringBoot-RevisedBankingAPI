@@ -1,6 +1,7 @@
 package com.cognixia.jumplus.controller;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,19 +50,13 @@ public class AccountController {
 		
 		acc.setId(0L);
 		
-		List<Transaction> transactions = acc.getTransactions();
-		acc.setTransactions(null);
-		
 		Account newAcc = repo.save(acc);
 		
-		List<Transaction> newTransactions = new ArrayList<Transaction>();
-		for(Transaction t : transactions) {
-			t.setId(0L);
-			t.setAccount(newAcc);
-			newTransactions.add(transRepo.save(t));
-		}
+		Transaction initialDeposit = new Transaction(0L, "Initial Deposit", "Funds added to account '" + newAcc.getUsername() + "'.", newAcc.getBalance(), new Date(), newAcc);
 		
-		newAcc.setTransactions(newTransactions);
+		transRepo.save(initialDeposit);
+		
+		newAcc.attachTransactions();
 		
 		return ResponseEntity.status(201).body(newAcc);
 	}
@@ -105,6 +100,49 @@ public class AccountController {
 			return found.get();
 		}
 		throw new Exception("Account with username of '" + username + "' not found.");
+		
+	}
+	
+	@PutMapping("/username/deposit/{username}/{amount}")
+	public Account depositAmount(@PathVariable String username , @PathVariable Double amount) throws Exception {
+		
+			Account user = getAccountByUsername(username);
+		
+			Double newBalance = user.getBalance() + amount;
+			user.setBalance(newBalance);
+			
+			
+			Transaction deposit = new Transaction(0L, "Deposit", "Funds deposited to account '" + user.getUsername() + "'.", amount, new Date(), user);
+			
+			transRepo.save(deposit);
+			
+			user.attachTransactions();
+			
+			return updateAccount(user);
+		
+		
+	}
+	
+	@PutMapping("/username/withdraw/{username}/{amount}")
+	public Account withdrawAmount(@PathVariable String username , @PathVariable Double amount) throws Exception {
+		
+			
+		Account user = getAccountByUsername(username);
+		if(amount > user.getBalance()) {
+			throw new Exception("Insufficient Balance");
+		}
+		else {
+			Double newBalance = user.getBalance() - amount;
+			user.setBalance(newBalance);
+			
+			Transaction withdraw = new Transaction(0L, "Withdraw", "Funds withdrawn from account '" + user.getUsername() + "'.", amount * -1.0, new Date(), user);
+			
+			transRepo.save(withdraw);
+			
+			user.attachTransactions();
+			
+			return updateAccount(user);
+		}
 		
 	}
 
